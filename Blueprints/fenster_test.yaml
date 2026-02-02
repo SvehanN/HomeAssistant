@@ -1,8 +1,9 @@
 blueprint:
-  name: Fenster Test – Area Minimal (OFF/AUTO)
+  name: Fenster steuert Heizkörper (Area + Restore + Zigbee/Homematic)
   description: >
-    Minimaler Area-Test: Fenster auf = OFF, Fenster zu = AUTO.
-    Keine Helper, kein Restore. Heizkörper wird automatisch über die Area gefunden.
+    Fenster auf: Modus speichern + OFF.
+    Fenster zu: gespeicherten Modus wiederherstellen (auto/heat).
+    Area-basiert, Zigbee-kompatibel, Homematic-kompatibel, Tuya-sicher.
   domain: automation
 
   input:
@@ -16,7 +17,7 @@ blueprint:
             - door
             - opening
 
-mode: single
+mode: parallel
 
 trigger:
   - platform: state
@@ -38,14 +39,16 @@ action:
   - service: system_log.write
     data:
       message: >
-        AREA-TEST: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        RESTORE: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
 
   - choose:
 
-      # Fenster AUF → OFF
+      # ---------------------------------------------------------
+      # FENSTER AUF → Modus speichern + OFF
+      # ---------------------------------------------------------
       - conditions:
           - condition: state
             entity_id: !input fenster
@@ -54,18 +57,30 @@ action:
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
+                - variables:
+                    entity: "{{ repeat.item }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    saved: "{{ states(entity) | default('heat', true) }}"
+
+                - service: input_text.set_value
+                  data:
+                    entity_id: "{{ helper }}"
+                    value: "{{ saved }}"
+
                 - service: system_log.write
                   data:
-                    message: "AREA-TEST: Fenster AUF → OFF für {{ repeat.item }}"
+                    message: "RESTORE: Speichere {{ saved }} für {{ entity }} → OFF"
                     level: info
 
                 - service: climate.set_hvac_mode
                   target:
-                    entity_id: "{{ repeat.item }}"
+                    entity_id: "{{ entity }}"
                   data:
                     hvac_mode: "off"
 
-      # Fenster ZU → AUTO
+      # ---------------------------------------------------------
+      # FENSTER ZU → Restore (Tuya-sicher)
+      # ---------------------------------------------------------
       - conditions:
           - condition: state
             entity_id: !input fenster
@@ -74,13 +89,39 @@ action:
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
+                - variables:
+                    entity: "{{ repeat.item }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    saved: "{{ states(helper) | default('heat', true) }}"
+                    modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
+
+                    zielmodus: >
+                      {% if saved == 'off' %}
+                        heat
+                      {% elif saved == 'auto' and 'auto' in modes %}
+                        auto
+                      {% elif saved == 'heat' and 'heat' in modes %}
+                        heat
+                      {% elif 'heat' in modes %}
+                        heat
+                      {% else %}
+                        none
+                      {% endif %}
+
                 - service: system_log.write
                   data:
-                    message: "AREA-TEST: Fenster ZU → AUTO für {{ repeat.item }}"
+                    message: >
+                      RESTORE: {{ entity }} → gespeichert='{{ saved }}',
+                      erlaubt='{{ modes }}', Ziel='{{ zielmodus }}'
                     level: info
 
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ repeat.item }}"
-                  data:
-                    hvac_mode: "auto"
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ zielmodus != 'none' }}"
+                      sequence:
+                        - service: climate.set_hvac_mode
+                          target:
+                            entity_id: "{{ entity }}"
+                          data:
+                            hvac_mode: "{{ zielmodus }}"
