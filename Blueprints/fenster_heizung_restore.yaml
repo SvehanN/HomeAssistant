@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (TESTVERSION – Fenster-ZU setzt immer AUTO)
+  name: Fenster steuert Heizkörper (Area + Zigbee-kompatibel)
   description: >
-    Testversion: Beim Fenster-ZU wird IMMER direkt hvac_mode=auto gesetzt.
-    Damit prüfen wir, ob der Restore-Block ausgeführt wird und ob Tuya den Modus akzeptiert.
+    Area-basierte Heizungssteuerung. Tuya/Zigbee-kompatibel durch Device-Service-Calls.
+    Off wird nie restored. Auto/Heat werden sicher gesetzt.
   domain: automation
 
   input:
@@ -58,7 +58,7 @@ action:
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF → Heizkörper ausschalten
+      # FENSTER AUF → Modus speichern + OFF
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -69,21 +69,30 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
+                    device: "{{ device_id(entity) }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    saved: "{{ states(entity) | default('heat', true) }}"
+
+                - service: input_text.set_value
+                  data:
+                    entity_id: "{{ helper }}"
+                    value: "{{ saved }}"
 
                 - service: system_log.write
                   data:
-                    message: "TEST: Fenster AUF → Schalte {{ entity }} auf OFF"
+                    message: "Speichere Modus {{ saved }} für {{ entity }} und schalte OFF"
                     level: info
 
+                # Zigbee/Tuya-sicher: Device-Service statt climate.set_hvac_mode
                 - service: climate.set_hvac_mode
                   target:
-                    entity_id: "{{ entity }}"
+                    device_id: "{{ device }}"
                   data:
                     hvac_mode: "off"
 
-      # ----------------------------------------------------------
-      # FENSTER ZU → IMMER direkt AUTO setzen (Test)
-      # ----------------------------------------------------------
+      # ---------------------------------------------------------
+      # FENSTER ZU → Restore (Tuya-sicher)
+      # ---------------------------------------------------------
       - conditions:
           - condition: template
             value_template: "{{ is_state(fenster, 'off') }}"
@@ -93,14 +102,41 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
+                    device: "{{ device_id(entity) }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    saved: "{{ states(helper) | default('heat', true) }}"
+                    modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
+
+                    zielmodus: >
+                      {% if saved == 'off' %}
+                        heat
+                      {% elif saved == 'auto' and 'auto' in modes %}
+                        auto
+                      {% elif saved == 'heat' and 'heat' in modes %}
+                        heat
+                      {% elif 'heat' in modes %}
+                        heat
+                      {% else %}
+                        none
+                      {% endif %}
 
                 - service: system_log.write
                   data:
-                    message: "TEST: Fenster ZU → Setze {{ entity }} direkt auf AUTO"
+                    message: >
+                      Restore {{ entity }}:
+                      gespeichert='{{ saved }}',
+                      erlaubt='{{ modes }}',
+                      Ziel='{{ zielmodus }}'
                     level: info
 
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ entity }}"
-                  data:
-                    hvac_mode: "auto"
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ zielmodus != 'none' }}"
+                      sequence:
+                        # Zigbee/Tuya-sicher: Device-Service statt climate.set_hvac_mode
+                        - service: climate.set_hvac_mode
+                          target:
+                            device_id: "{{ device }}"
+                          data:
+                            hvac_mode: "{{ zielmodus }}"
