@@ -1,0 +1,69 @@
+blueprint:
+  name: Fenster Test – Minimal (nur OFF/AUTO)
+  description: >
+    Minimaler Test: Fenster auf = OFF, Fenster zu = AUTO.
+    Keine Helper, keine Areas, keine Restore-Logik.
+  domain: automation
+
+  input:
+    fenster:
+      name: Fensterkontakt
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class:
+            - window
+            - door
+            - opening
+
+    heizkoerper:
+      name: Heizkörper
+      selector:
+        entity:
+          domain: climate
+
+mode: single
+
+trigger:
+  - platform: state
+    entity_id: !input fenster
+    to:
+      - "on"
+      - "off"
+
+action:
+  - choose:
+
+      # Fenster AUF → OFF
+      - conditions:
+          - condition: state
+            entity_id: !input fenster
+            state: "on"
+        sequence:
+          - service: system_log.write
+            data:
+              message: "TEST: Fenster AUF → OFF"
+              level: info
+
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: !input heizkoerper
+            data:
+              hvac_mode: "off"
+
+      # Fenster ZU → AUTO
+      - conditions:
+          - condition: state
+            entity_id: !input fenster
+            state: "off"
+        sequence:
+          - service: system_log.write
+            data:
+              message: "TEST: Fenster ZU → AUTO"
+              level: info
+
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: !input heizkoerper
+            data:
+              hvac_mode: "auto"
