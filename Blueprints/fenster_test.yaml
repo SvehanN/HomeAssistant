@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area
+  name: Fenster Test – Ultra Minimal + Area FIX V2
   description: >
     Fenster auf = OFF, Fenster zu = AUTO.
-    Ultra-minimal, aber mit Area-Erkennung.
+    Ultra-minimal, aber mit Area-Erkennung und Zigbee-kompatibler Übergabe.
     Keine Restore-Logik, keine Helper.
   domain: automation
 
@@ -39,7 +39,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        ULTRA-AREA: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        ULTRA-AREA-FIX-V2: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
@@ -52,14 +52,13 @@ action:
             entity_id: !input fenster
             state: "on"
         sequence:
-          - repeat:
-              for_each: "{{ heizkoerper }}"
-              sequence:
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ repeat.item }}"
-                  data:
-                    hvac_mode: "off"
+          - variables:
+              heiz_liste: "{{ heizkoerper | list }}"
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: "{{ heiz_liste }}"
+            data:
+              hvac_mode: "off"
 
       # Fenster ZU → AUTO
       - conditions:
@@ -67,11 +66,10 @@ action:
             entity_id: !input fenster
             state: "off"
         sequence:
-          - repeat:
-              for_each: "{{ heizkoerper }}"
-              sequence:
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ repeat.item }}"
-                  data:
-                    hvac_mode: "auto"
+          - variables:
+              heiz_liste: "{{ heizkoerper | list }}"
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: "{{ heiz_liste }}"
+            data:
+              hvac_mode: "auto"
