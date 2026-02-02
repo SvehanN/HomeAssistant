@@ -1,7 +1,7 @@
 blueprint:
   name: Fenster steuert Heizkörper (Area + Zigbee-kompatibel)
   description: >
-    Area-basierte Heizungssteuerung. Tuya/Zigbee-kompatibel durch Device-Service-Calls.
+    Area-basierte Heizungssteuerung. Zigbee/Tuya-kompatibel durch entity_id-Service-Calls.
     Off wird nie restored. Auto/Heat werden sicher gesetzt.
   domain: automation
 
@@ -69,7 +69,6 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
-                    device: "{{ device_id(entity) }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
                     saved: "{{ states(entity) | default('heat', true) }}"
 
@@ -83,10 +82,10 @@ action:
                     message: "Speichere Modus {{ saved }} für {{ entity }} und schalte OFF"
                     level: info
 
-                # Zigbee/Tuya-sicher: Device-Service statt climate.set_hvac_mode
+                # Zigbee/Tuya-sicher: entity_id statt device_id
                 - service: climate.set_hvac_mode
                   target:
-                    device_id: "{{ device }}"
+                    entity_id: "{{ entity }}"
                   data:
                     hvac_mode: "off"
 
@@ -102,7 +101,6 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
-                    device: "{{ device_id(entity) }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
                     saved: "{{ states(helper) | default('heat', true) }}"
                     modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
@@ -134,9 +132,9 @@ action:
                         - condition: template
                           value_template: "{{ zielmodus != 'none' }}"
                       sequence:
-                        # Zigbee/Tuya-sicher: Device-Service statt climate.set_hvac_mode
+                        # Zigbee/Tuya-sicher: entity_id statt device_id
                         - service: climate.set_hvac_mode
                           target:
-                            device_id: "{{ device }}"
+                            entity_id: "{{ entity }}"
                           data:
                             hvac_mode: "{{ zielmodus }}"
