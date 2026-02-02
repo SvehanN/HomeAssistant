@@ -3,7 +3,7 @@ blueprint:
   description: >
     Universeller Blueprint für Homematic & Tuya/Zigbee.
     Speichert gültige Modi (auto/heat/off) und stellt sie sicher wieder her.
-    Schutz vor ungültigen hvac_modes, robustes Logging, keine None-Werte.
+    Nutzt target: für zuverlässige Service-Calls. Keine ungültigen hvac_modes.
   domain: automation
 
   input:
@@ -71,7 +71,7 @@ action:
                 - variables:
                     entity: "{{ repeat.item }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    # Tuya-kompatibel: state statt hvac_mode speichern
+                    # Tuya-kompatibel: aktuellen Modus über state speichern
                     raw_mode: "{{ states(entity) | default('heat', true) }}"
                     current_mode: "{{ raw_mode | string }}"
                 - service: system_log.write
@@ -83,8 +83,9 @@ action:
                     entity_id: "{{ helper }}"
                     value: "{{ current_mode }}"
                 - service: climate.set_hvac_mode
-                  data:
+                  target:
                     entity_id: "{{ entity }}"
+                  data:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
@@ -102,7 +103,6 @@ action:
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
                     saved_raw: "{{ states(helper) | default('heat', true) }}"
                     modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
-                    # Robuste, Tuya-sichere Zielmodus-Bestimmung
                     zielmodus: >
                       {% set valid = modes %}
                       {% if saved_raw in valid %}
@@ -133,6 +133,7 @@ action:
                           value_template: "{{ zielmodus != 'none' }}"
                       sequence:
                         - service: climate.set_hvac_mode
-                          data:
+                          target:
                             entity_id: "{{ entity }}"
+                          data:
                             hvac_mode: "{{ zielmodus }}"
