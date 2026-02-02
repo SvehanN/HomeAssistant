@@ -1,9 +1,8 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area
+  name: Fenster Reset – Area Minimal (OFF/AUTO)
   description: >
-    Fenster auf = OFF, Fenster zu = AUTO.
-    Ultra-minimal, aber mit Area-Erkennung.
-    Keine Restore-Logik, keine Helper.
+    Reset-Version: Fenster auf = OFF, Fenster zu = AUTO.
+    Keine Restore-Logik, keine Helper. Area-basiert.
   domain: automation
 
   input:
@@ -39,7 +38,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        ULTRA-AREA: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        RESET: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
