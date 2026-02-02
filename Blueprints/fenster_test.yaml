@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area FIX V2
+  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 1
   description: >
-    Fenster auf = OFF, Fenster zu = AUTO.
-    Ultra-minimal, aber mit Area-Erkennung und Zigbee-kompatibler Übergabe.
-    Keine Restore-Logik, keine Helper.
+    Fenster auf = OFF (Modus speichern), Fenster zu = AUTO.
+    Area-Erkennung + Zigbee-kompatible Übergabe.
+    Restore wird NICHT ausgeführt, nur gespeichert.
   domain: automation
 
   input:
@@ -16,6 +16,12 @@ blueprint:
             - window
             - door
             - opening
+
+    modus_speicher:
+      name: Helper zum Speichern des Modus
+      selector:
+        entity:
+          domain: input_text
 
 mode: single
 
@@ -39,14 +45,14 @@ action:
   - service: system_log.write
     data:
       message: >
-        ULTRA-AREA-FIX-V2: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        RESTORE-STUFE-1: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
 
   - choose:
 
-      # Fenster AUF → OFF
+      # Fenster AUF → OFF + Modus speichern
       - conditions:
           - condition: state
             entity_id: !input fenster
@@ -54,13 +60,22 @@ action:
         sequence:
           - variables:
               heiz_liste: "{{ heizkoerper | list }}"
+              erster_heizkoerper: "{{ heiz_liste[0] }}"
+              aktueller_modus: "{{ state_attr(erster_heizkoerper, 'hvac_mode') }}"
+
+          - service: input_text.set_value
+            target:
+              entity_id: !input modus_speicher
+            data:
+              value: "{{ aktueller_modus }}"
+
           - service: climate.set_hvac_mode
             target:
               entity_id: "{{ heiz_liste }}"
             data:
               hvac_mode: "off"
 
-      # Fenster ZU → AUTO
+      # Fenster ZU → AUTO (Restore noch NICHT aktiv)
       - conditions:
           - condition: state
             entity_id: !input fenster
