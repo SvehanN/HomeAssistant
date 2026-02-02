@@ -71,7 +71,8 @@ action:
                 - variables:
                     entity: "{{ repeat.item }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    raw_mode: "{{ state_attr(entity, 'hvac_mode') | default('heat', true) }}"
+                    # FIX: Tuya-kompatibel → state statt hvac_mode speichern
+                    raw_mode: "{{ states(entity) | default('heat', true) }}"
                     current_mode: "{{ raw_mode | string }}"
                 - service: system_log.write
                   data:
@@ -123,7 +124,6 @@ action:
                       Ziel='{{ zielmodus }}'
                     level: info
 
-                # Nur setzen, wenn ein gültiger Modus existiert
                 - choose:
                     - conditions:
                         - condition: template
@@ -133,4 +133,3 @@ action:
                           data:
                             entity_id: "{{ entity }}"
                             hvac_mode: "{{ zielmodus }}"
-
