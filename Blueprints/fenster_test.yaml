@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 2 FINAL
+  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 2 ZIGBEE-SAFE
   description: >
-    Fenster auf = OFF (Modus speichern VOR dem Ausschalten).
+    Fenster auf = OFF (Modus speichern VOR dem Ausschalten, Zigbee-sicher).
     Fenster zu = gespeicherten Modus wiederherstellen.
-    Zigbee-sicherer Modus-Speicher + Area-Erkennung.
+    Verhindert Race-Conditions bei TS0601-Zigbee-Thermostaten.
   domain: automation
 
   input:
@@ -49,7 +49,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        FINAL-STUFE-2: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        ZIGBEE-SAFE: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
@@ -57,7 +57,7 @@ action:
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF → Modus speichern → OFF
+      # FENSTER AUF → Modus speichern → kurze Pause → OFF
       # ---------------------------------------------------------
       - conditions:
           - condition: state
@@ -76,6 +76,10 @@ action:
               entity_id: !input modus_speicher
             data:
               value: "{{ aktueller_modus }}"
+
+          # WICHTIG: kurze Verzögerung, damit Zigbee nicht vorher OFF meldet
+          - delay:
+              milliseconds: 200
 
           # Jetzt erst OFF setzen
           - service: climate.set_hvac_mode
@@ -110,7 +114,7 @@ action:
           - service: system_log.write
             data:
               message: >
-                FINAL-STUFE-2: Restore → {{ restore_modus }}
+                ZIGBEE-SAFE: Restore → {{ restore_modus }}
               level: info
 
           - service: climate.set_hvac_mode
