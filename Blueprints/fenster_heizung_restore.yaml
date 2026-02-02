@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Modus-Speicherung + Logging, stabil)
+  name: Fenster steuert Heizkörper (stabil, Tuya-kompatibel)
   description: >
     Universeller Blueprint für Homematic & Tuya/Zigbee.
-    Speichert gültige Modi (auto/heat/off) und stellt sie wieder her.
-    Kompaktes Logging, keine None-Werte, keine ungültigen hvac_modes.
+    Speichert gültige Modi (auto/heat/off) und stellt sie sicher wieder her.
+    Schutz vor ungültigen hvac_modes, robustes Logging, keine None-Werte.
   domain: automation
 
   input:
@@ -71,7 +71,7 @@ action:
                 - variables:
                     entity: "{{ repeat.item }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    # FIX: Tuya-kompatibel → state statt hvac_mode speichern
+                    # Tuya-kompatibel: state statt hvac_mode speichern
                     raw_mode: "{{ states(entity) | default('heat', true) }}"
                     current_mode: "{{ raw_mode | string }}"
                 - service: system_log.write
@@ -102,15 +102,17 @@ action:
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
                     saved_raw: "{{ states(helper) | default('heat', true) }}"
                     modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
+                    # Robuste, Tuya-sichere Zielmodus-Bestimmung
                     zielmodus: >
-                      {% if modes | length == 0 %}
-                        none
-                      {% elif saved_raw in modes %}
+                      {% set valid = modes %}
+                      {% if saved_raw in valid %}
                         {{ saved_raw }}
-                      {% elif 'auto' in modes %}
+                      {% elif 'auto' in valid %}
                         auto
-                      {% elif 'heat' in modes %}
+                      {% elif 'heat' in valid %}
                         heat
+                      {% elif 'off' in valid %}
+                        off
                       {% else %}
                         none
                       {% endif %}
@@ -124,6 +126,7 @@ action:
                       Ziel='{{ zielmodus }}'
                     level: info
 
+                # Nur setzen, wenn ein gültiger Modus existiert
                 - choose:
                     - conditions:
                         - condition: template
