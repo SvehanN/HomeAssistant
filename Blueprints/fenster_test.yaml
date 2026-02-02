@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area
+  name: Fenster Test – Ultra Minimal + Area FIX
   description: >
     Fenster auf = OFF, Fenster zu = AUTO.
-    Ultra-minimal, aber mit Area-Erkennung.
+    Ultra-minimal, aber mit Area-Erkennung und Zigbee-Fix.
     Keine Restore-Logik, keine Helper.
   domain: automation
 
@@ -39,7 +39,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        ULTRA-AREA: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        ULTRA-AREA-FIX: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
@@ -57,7 +57,8 @@ action:
               sequence:
                 - service: climate.set_hvac_mode
                   target:
-                    entity_id: "{{ repeat.item }}"
+                    entity_id:
+                      - "{{ repeat.item }}"
                   data:
                     hvac_mode: "off"
 
@@ -72,6 +73,7 @@ action:
               sequence:
                 - service: climate.set_hvac_mode
                   target:
-                    entity_id: "{{ repeat.item }}"
+                    entity_id:
+                      - "{{ repeat.item }}"
                   data:
                     hvac_mode: "auto"
