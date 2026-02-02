@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster Test – Area Minimal (OFF/AUTO)
+  name: Fenster Test – Minimal (nur OFF/AUTO)
   description: >
-    Minimaler Area-Test: Fenster auf = OFF, Fenster zu = AUTO.
-    Keine Helper, kein Restore. Heizkörper wird automatisch über die Area gefunden.
+    Minimaler Test: Fenster auf = OFF, Fenster zu = AUTO.
+    Keine Helper, keine Areas, keine Restore-Logik.
   domain: automation
 
   input:
@@ -16,6 +16,12 @@ blueprint:
             - door
             - opening
 
+    heizkoerper:
+      name: Heizkörper
+      selector:
+        entity:
+          domain: climate
+
 mode: single
 
 trigger:
@@ -26,23 +32,6 @@ trigger:
       - "off"
 
 action:
-  - variables:
-      fenster_entity: "{{ trigger.entity_id }}"
-      fenster_area: "{{ area_id(fenster_entity) }}"
-      area_entities_list: "{{ area_entities(fenster_area) }}"
-      heizkoerper: >
-        {{ area_entities_list
-           | select('match', '^climate\\.')
-           | list }}
-
-  - service: system_log.write
-    data:
-      message: >
-        AREA-TEST: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
-        Area={{ fenster_area }},
-        Heizkörper={{ heizkoerper }}
-      level: info
-
   - choose:
 
       # Fenster AUF → OFF
@@ -51,19 +40,16 @@ action:
             entity_id: !input fenster
             state: "on"
         sequence:
-          - repeat:
-              for_each: "{{ heizkoerper }}"
-              sequence:
-                - service: system_log.write
-                  data:
-                    message: "AREA-TEST: Fenster AUF → OFF für {{ repeat.item }}"
-                    level: info
+          - service: system_log.write
+            data:
+              message: "TEST: Fenster AUF → OFF"
+              level: info
 
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ repeat.item }}"
-                  data:
-                    hvac_mode: "off"
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: !input heizkoerper
+            data:
+              hvac_mode: "off"
 
       # Fenster ZU → AUTO
       - conditions:
@@ -71,16 +57,13 @@ action:
             entity_id: !input fenster
             state: "off"
         sequence:
-          - repeat:
-              for_each: "{{ heizkoerper }}"
-              sequence:
-                - service: system_log.write
-                  data:
-                    message: "AREA-TEST: Fenster ZU → AUTO für {{ repeat.item }}"
-                    level: info
+          - service: system_log.write
+            data:
+              message: "TEST: Fenster ZU → AUTO"
+              level: info
 
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ repeat.item }}"
-                  data:
-                    hvac_mode: "auto"
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: !input heizkoerper
+            data:
+              hvac_mode: "auto"
