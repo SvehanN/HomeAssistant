@@ -1,7 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (mit Modus-Speicherung & Auto-Helper + Logging)
+  name: Fenster steuert Heizkörper (Modus-Speicherung + Logging, stabil)
   description: >
-    Stabiler Blueprint mit Fallbacks für Homematic, Zigbee & Co.
+    Universeller Blueprint für Homematic & Tuya/Zigbee.
+    Speichert gültige Modi (auto/heat/off) und stellt sie wieder her.
+    Kompaktes Logging, keine None-Werte, keine ungültigen hvac_modes.
   domain: automation
 
   input:
@@ -57,7 +59,7 @@ action:
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF
+      # FENSTER AUF → Modus speichern + off
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -78,14 +80,14 @@ action:
                 - service: input_text.set_value
                   data:
                     entity_id: "{{ helper }}"
-                    value: "{{ current_mode | string }}"
+                    value: "{{ current_mode }}"
                 - service: climate.set_hvac_mode
                   data:
                     entity_id: "{{ entity }}"
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU
+      # FENSTER ZU → gespeicherten Modus wiederherstellen
       # ---------------------------------------------------------
       - conditions:
           - condition: template
