@@ -49,11 +49,12 @@ condition:
 action:
 
   # ---------------------------------------------------------
-  # Gemeinsame Variablen
+  # Gemeinsame Variablen (KEIN !input in Templates!)
   # ---------------------------------------------------------
   - variables:
       trigger_entity: "{{ trigger.entity_id }}"
-      is_window: "{{ trigger_entity in ( !input fensterkontakte ) }}"
+      fenster_liste: !input fensterkontakte
+      is_window: "{{ trigger_entity in fenster_liste }}"
       is_climate: "{{ trigger_entity.startswith('climate.') }}"
 
   # ---------------------------------------------------------
