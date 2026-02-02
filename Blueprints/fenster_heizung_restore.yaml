@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (stabil, Tuya-kompatibel)
+  name: Fenster steuert Heizkörper (Tuya-sicher & stabil)
   description: >
-    Universeller Blueprint für Homematic & Tuya/Zigbee.
-    Speichert gültige Modi (auto/heat/off) und stellt sie sicher wieder her.
-    Nutzt target: für zuverlässige Service-Calls. Keine ungültigen hvac_modes.
+    Tuya-sichere Version: verhindert not_valid_hvac_mode.
+    Off wird nie restored. Auto wird nur restored, wenn Tuya es erlaubt.
+    Fallback = heat. Homematic bleibt voll kompatibel.
   domain: automation
 
   input:
@@ -71,17 +71,19 @@ action:
                 - variables:
                     entity: "{{ repeat.item }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    # Tuya-kompatibel: aktuellen Modus über state speichern
                     raw_mode: "{{ states(entity) | default('heat', true) }}"
                     current_mode: "{{ raw_mode | string }}"
+
                 - service: system_log.write
                   data:
                     message: "Speichere Modus für {{ entity }}: {{ current_mode }}"
                     level: info
+
                 - service: input_text.set_value
                   data:
                     entity_id: "{{ helper }}"
                     value: "{{ current_mode }}"
+
                 - service: climate.set_hvac_mode
                   target:
                     entity_id: "{{ entity }}"
@@ -89,7 +91,7 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → fehlertolerantes Wiederherstellen
+      # FENSTER ZU → Tuya-sicheres Restore
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -103,16 +105,21 @@ action:
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
                     saved_raw: "{{ states(helper) | default('heat', true) }}"
                     modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
+
+                    # Tuya-sichere Restore-Logik:
+                    # - off wird NIE restored
+                    # - auto nur, wenn Tuya es erlaubt
+                    # - fallback = heat
                     zielmodus: >
                       {% set valid = modes %}
-                      {% if saved_raw in valid %}
-                        {{ saved_raw }}
-                      {% elif 'auto' in valid %}
+                      {% if saved_raw == 'off' %}
+                        heat
+                      {% elif saved_raw == 'auto' and 'auto' in valid %}
                         auto
+                      {% elif saved_raw == 'heat' and 'heat' in valid %}
+                        heat
                       {% elif 'heat' in valid %}
                         heat
-                      {% elif 'off' in valid %}
-                        off
                       {% else %}
                         none
                       {% endif %}
@@ -126,7 +133,6 @@ action:
                       Ziel='{{ zielmodus }}'
                     level: info
 
-                # Nur setzen, wenn ein gültiger Modus existiert
                 - choose:
                     - conditions:
                         - condition: template
