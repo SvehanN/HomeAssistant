@@ -87,7 +87,7 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → gespeicherten Modus wiederherstellen
+      # FENSTER ZU → fehlertolerantes Wiederherstellen
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -101,21 +101,36 @@ action:
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
                     saved_raw: "{{ states(helper) | default('heat', true) }}"
                     modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
-                    saved: >
-                      {% if saved_raw in modes %}
+                    zielmodus: >
+                      {% if modes | length == 0 %}
+                        none
+                      {% elif saved_raw in modes %}
                         {{ saved_raw }}
                       {% elif 'auto' in modes %}
                         auto
                       {% elif 'heat' in modes %}
                         heat
                       {% else %}
-                        heat
+                        none
                       {% endif %}
+
                 - service: system_log.write
                   data:
-                    message: "Stelle Modus für {{ entity }} wieder her: {{ saved }}"
+                    message: >
+                      Restore für {{ entity }}:
+                      gespeicherter Modus='{{ saved_raw }}',
+                      verfügbare Modi='{{ modes }}',
+                      Ziel='{{ zielmodus }}'
                     level: info
-                - service: climate.set_hvac_mode
-                  data:
-                    entity_id: "{{ entity }}"
-                    hvac_mode: "{{ saved }}"
+
+                # Nur setzen, wenn ein gültiger Modus existiert
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ zielmodus != 'none' }}"
+                      sequence:
+                        - service: climate.set_hvac_mode
+                          data:
+                            entity_id: "{{ entity }}"
+                            hvac_mode: "{{ zielmodus }}"
+
