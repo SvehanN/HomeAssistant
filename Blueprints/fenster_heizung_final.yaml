@@ -36,7 +36,7 @@ trigger:
       - "on"
       - "off"
 
-  # Modus-Tracker: alle Climate-Entities im System
+  # Modus-Tracker: alle Climate-Entities
   - platform: state
     entity_id: >
       {{ states.climate | map(attribute='entity_id') | list }}
@@ -49,16 +49,21 @@ condition:
 action:
 
   # ---------------------------------------------------------
-  # Gemeinsame Variablen (KEIN !input in Templates!)
+  # 1) YAML-Variablen (dürfen !input enthalten)
+  # ---------------------------------------------------------
+  - variables:
+      fenster_liste: !input fensterkontakte
+
+  # ---------------------------------------------------------
+  # 2) Template-Variablen (KEIN !input erlaubt)
   # ---------------------------------------------------------
   - variables:
       trigger_entity: "{{ trigger.entity_id }}"
-      fenster_liste: !input fensterkontakte
       is_window: "{{ trigger_entity in fenster_liste }}"
       is_climate: "{{ trigger_entity.startswith('climate.') }}"
 
   # ---------------------------------------------------------
-  # 1) MODUS-TRACKER (wenn ein Heizkörper sich ändert)
+  # 3) MODUS-TRACKER (wenn ein Heizkörper sich ändert)
   # ---------------------------------------------------------
   - choose:
       - conditions:
@@ -78,7 +83,7 @@ action:
               level: info
 
   # ---------------------------------------------------------
-  # 2) FENSTER-AKTIONEN (wenn ein Fenster triggert)
+  # 4) FENSTER-AKTIONEN
   # ---------------------------------------------------------
   - choose:
 
