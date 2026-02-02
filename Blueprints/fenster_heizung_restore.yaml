@@ -1,11 +1,13 @@
 blueprint:
-  name: Fenster steuert Heizkörper (mit Modus-Speicherung & Auto-Helper)
+  name: Fenster steuert Heizkörper (mit Modus-Speicherung & Auto-Helper + Logging)
   description: >
     Steuert alle Heizkörper in derselben Area wie der Fensterkontakt.
     Beim Öffnen: Heizkörper AUS + vorherigen Modus speichern.
     Beim Schließen: gespeicherten Modus wiederherstellen.
     Input-Text-Helper werden automatisch erzeugt.
+    Kompaktes Logging für Debugging.
   domain: automation
+
   input:
     fensterkontakte:
       name: Fensterkontakte
@@ -51,6 +53,14 @@ action:
            | select('match', '^climate\\.')
            | list }}
 
+  # Logging: Fenster + Area + Heizkörper
+  - service: system_log.write
+    data:
+      message: >
+        Fensteraktion: {{ fenster }} ({{ states(fenster) }}), Area: {{ fenster_area }},
+        Heizkörper gefunden: {{ heizkoerper }}
+      level: info
+
   - choose:
 
       # ---------------------------------------------------------
@@ -66,8 +76,14 @@ action:
                 - variables:
                     entity: "{{ repeat.item }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    current_mode: "{{ state_attr(entity, 'hvac_mode') }}"
-                # Helper automatisch erzeugen (falls nicht vorhanden)
+                    current_mode: "{{ state_attr(entity, 'hvac_mode') | default('heat') }}"
+                # Logging: Speichern
+                - service: system_log.write
+                  data:
+                    message: >
+                      Speichere Modus für {{ entity }}: {{ current_mode }}
+                    level: info
+                # Helper automatisch erzeugen
                 - service: input_text.set_value
                   data:
                     entity_id: "{{ helper }}"
@@ -103,6 +119,12 @@ action:
                       {% else %}
                         heat
                       {% endif %}
+                # Logging: Wiederherstellen
+                - service: system_log.write
+                  data:
+                    message: >
+                      Stelle Modus für {{ entity }} wieder her: {{ zielmodus }}
+                    level: info
                 - service: climate.set_hvac_mode
                   data:
                     entity_id: "{{ entity }}"
