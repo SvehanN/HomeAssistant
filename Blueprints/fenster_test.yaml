@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster Test – Area Minimal + Delay (OFF → AUTO)
+  name: Fenster Test – Area Minimal (OFF → HEAT)
   description: >
-    Test 1: Fenster auf = OFF, Fenster zu = AUTO mit 0.5s Delay.
-    Prüft, ob Zigbee den Moduswechsel erst nach kurzer Pause akzeptiert.
+    Test 2: Fenster auf = OFF, Fenster zu = HEAT.
+    Prüft, ob Zigbee AUTO blockiert, aber HEAT akzeptiert.
   domain: automation
 
   input:
@@ -38,7 +38,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        TEST1-DELAY: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        TEST2-HEAT: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
@@ -56,7 +56,7 @@ action:
               sequence:
                 - service: system_log.write
                   data:
-                    message: "TEST1-DELAY: Fenster AUF → OFF für {{ repeat.item }}"
+                    message: "TEST2-HEAT: Fenster AUF → OFF für {{ repeat.item }}"
                     level: info
 
                 - service: climate.set_hvac_mode
@@ -65,24 +65,22 @@ action:
                   data:
                     hvac_mode: "off"
 
-      # Fenster ZU → AUTO (mit Delay)
+      # Fenster ZU → HEAT
       - conditions:
           - condition: state
             entity_id: !input fenster
             state: "off"
         sequence:
-          - delay: "00:00:00.5"
-
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
                 - service: system_log.write
                   data:
-                    message: "TEST1-DELAY: Fenster ZU → AUTO (0.5s Delay) für {{ repeat.item }}"
+                    message: "TEST2-HEAT: Fenster ZU → HEAT für {{ repeat.item }}"
                     level: info
 
                 - service: climate.set_hvac_mode
                   target:
                     entity_id: "{{ repeat.item }}"
                   data:
-                    hvac_mode: "auto"
+                    hvac_mode: "heat"
