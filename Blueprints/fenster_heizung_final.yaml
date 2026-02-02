@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Area + Zigbee-SAFE + Multi + Master)
+  name: Fenster steuert Heizkörper (Multi, Master, Area, Zigbee-SAFE)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Zigbee/Tuya-sicher: Modus wird NICHT beim Fensteröffnen gespeichert,
+    Zigbee-sicher: Modus wird NICHT beim Fensteröffnen gespeichert,
     sondern automatisch getrackt, sobald er sich ändert.
     Restore setzt zuverlässig AUTO/HEAT, OFF wird nie restored.
   domain: automation
@@ -29,21 +29,17 @@ blueprint:
 mode: parallel
 
 trigger:
+  # Fensterkontakte
   - platform: state
     entity_id: !input fensterkontakte
     to:
       - "on"
       - "off"
 
-  # -----------------------------------------
-  # MODUS-TRACKER: speichert Modus bei Änderung
-  # -----------------------------------------
+  # Modus-Tracker: alle Climate-Entities im System
   - platform: state
     entity_id: >
-      {{ expand(area_entities(area_id(entity_id))) 
-         | selectattr('domain','equalto','climate')
-         | map(attribute='entity_id')
-         | list }}
+      {{ states.climate | map(attribute='entity_id') | list }}
 
 condition:
   - condition: state
@@ -56,48 +52,50 @@ action:
   # Gemeinsame Variablen
   # ---------------------------------------------------------
   - variables:
-      fenster: "{{ trigger.entity_id }}"
-      fenster_area: "{{ area_id(fenster) }}"
-      area_entities_list: "{{ area_entities(fenster_area) }}"
-      heizkoerper: >
-        {{ area_entities_list
-           | select('match', '^climate\\.')
-           | list }}
+      trigger_entity: "{{ trigger.entity_id }}"
+      is_window: "{{ trigger_entity in ( !input fensterkontakte ) }}"
+      is_climate: "{{ trigger_entity.startswith('climate.') }}"
 
   # ---------------------------------------------------------
-  # MODUS-TRACKER: Wenn Trigger ein Heizkörper ist → Modus speichern
+  # 1) MODUS-TRACKER (wenn ein Heizkörper sich ändert)
   # ---------------------------------------------------------
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ trigger.entity_id in heizkoerper }}"
+            value_template: "{{ is_climate }}"
         sequence:
           - variables:
-              entity: "{{ trigger.entity_id }}"
-              helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-              saved: "{{ states(entity) }}"
+              helper: "input_text.heizmodus_{{ trigger_entity|replace('.', '_') }}"
+              saved: "{{ states(trigger_entity) }}"
           - service: input_text.set_value
             data:
               entity_id: "{{ helper }}"
               value: "{{ saved }}"
           - service: system_log.write
             data:
-              message: "Tracker: Speichere Modus {{ saved }} für {{ entity }}"
+              message: "Tracker: Speichere Modus {{ saved }} für {{ trigger_entity }}"
               level: info
-        default: []
 
   # ---------------------------------------------------------
-  # FENSTER-AKTIONEN
+  # 2) FENSTER-AKTIONEN (wenn ein Fenster triggert)
   # ---------------------------------------------------------
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF → OFF (Modus NICHT speichern!)
+      # FENSTER AUF → OFF
       # ---------------------------------------------------------
       - conditions:
           - condition: template
-            value_template: "{{ is_state(fenster, 'on') }}"
+            value_template: "{{ is_window and is_state(trigger_entity, 'on') }}"
         sequence:
+          - variables:
+              fenster_area: "{{ area_id(trigger_entity) }}"
+              area_entities_list: "{{ area_entities(fenster_area) }}"
+              heizkoerper: >
+                {{ area_entities_list
+                   | select('match', '^climate\\.')
+                   | list }}
+
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
@@ -113,12 +111,20 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → Restore aus Helper
+      # FENSTER ZU → Restore
       # ---------------------------------------------------------
       - conditions:
           - condition: template
-            value_template: "{{ is_state(fenster, 'off') }}"
+            value_template: "{{ is_window and is_state(trigger_entity, 'off') }}"
         sequence:
+          - variables:
+              fenster_area: "{{ area_id(trigger_entity) }}"
+              area_entities_list: "{{ area_entities(fenster_area) }}"
+              heizkoerper: >
+                {{ area_entities_list
+                   | select('match', '^climate\\.')
+                   | list }}
+
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
