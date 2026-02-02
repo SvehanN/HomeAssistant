@@ -1,0 +1,106 @@
+blueprint:
+  name: Fenster steuert Heizkörper (mit Modus-Speicherung & Auto-Helper)
+  description: >
+    Steuert alle Heizkörper in derselben Area wie der Fensterkontakt.
+    Beim Öffnen: Heizkörper AUS + vorherigen Modus speichern.
+    Beim Schließen: gespeicherten Modus wiederherstellen.
+    Input-Text-Helper werden automatisch erzeugt.
+  domain: automation
+  input:
+    fensterkontakte:
+      name: Fensterkontakte
+      description: Wähle alle Fensterkontakte aus, die diese Logik steuern sollen.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class: window
+          multiple: true
+
+    master_switch:
+      name: Hauptschalter Heizung
+      description: Ohne diesen Schalter bleibt alles aus.
+      default: input_boolean.heizung_gesamt
+      selector:
+        entity:
+          domain: input_boolean
+
+mode: parallel
+
+trigger:
+  - platform: state
+    entity_id: !input fensterkontakte
+    to:
+      - "on"
+      - "off"
+
+condition:
+  - condition: state
+    entity_id: !input master_switch
+    state: "on"
+
+action:
+  - variables:
+      fenster: "{{ trigger.entity_id }}"
+      fenster_area: "{{ area_id(fenster) }}"
+      area_entities_list: "{{ area_entities(fenster_area) }}"
+      heizkoerper: >
+        {{ area_entities_list
+           | select('match', '^climate\\.')
+           | list }}
+
+  - choose:
+
+      # ---------------------------------------------------------
+      # FENSTER AUF → Modus speichern + Thermostate ausschalten
+      # ---------------------------------------------------------
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state(fenster, 'on') }}"
+        sequence:
+          - repeat:
+              for_each: "{{ heizkoerper }}"
+              sequence:
+                - variables:
+                    entity: "{{ repeat.item }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    current_mode: "{{ state_attr(entity, 'hvac_mode') }}"
+                # Helper automatisch erzeugen (falls nicht vorhanden)
+                - service: input_text.set_value
+                  data:
+                    entity_id: "{{ helper }}"
+                    value: "{{ current_mode }}"
+                # Heizkörper ausschalten
+                - service: climate.set_hvac_mode
+                  data:
+                    entity_id: "{{ entity }}"
+                    hvac_mode: "off"
+
+      # ---------------------------------------------------------
+      # FENSTER ZU → gespeicherten Modus wiederherstellen
+      # ---------------------------------------------------------
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state(fenster, 'off') }}"
+        sequence:
+          - repeat:
+              for_each: "{{ heizkoerper }}"
+              sequence:
+                - variables:
+                    entity: "{{ repeat.item }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    saved: "{{ states(helper) }}"
+                    modes: "{{ state_attr(entity, 'hvac_modes') }}"
+                    zielmodus: >
+                      {% if saved in modes %}
+                        {{ saved }}
+                      {% elif 'auto' in modes %}
+                        auto
+                      {% elif 'heat' in modes %}
+                        heat
+                      {% else %}
+                        heat
+                      {% endif %}
+                - service: climate.set_hvac_mode
+                  data:
+                    entity_id: "{{ entity }}"
+                    hvac_mode: "{{ zielmodus }}"
