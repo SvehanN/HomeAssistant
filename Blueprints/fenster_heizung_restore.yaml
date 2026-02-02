@@ -1,9 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Tuya-sicher & stabil)
+  name: Fenster steuert Heizkörper (TESTVERSION – Fenster-ZU setzt immer AUTO)
   description: >
-    Tuya-sichere Version: verhindert not_valid_hvac_mode.
-    Off wird nie restored. Auto wird nur restored, wenn Tuya es erlaubt.
-    Fallback = heat. Homematic bleibt voll kompatibel.
+    Testversion: Beim Fenster-ZU wird IMMER direkt hvac_mode=auto gesetzt.
+    Damit prüfen wir, ob der Restore-Block ausgeführt wird und ob Tuya den Modus akzeptiert.
   domain: automation
 
   input:
@@ -59,7 +58,7 @@ action:
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF → Modus speichern + off
+      # FENSTER AUF → Heizkörper ausschalten
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -70,19 +69,11 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
-                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    raw_mode: "{{ states(entity) | default('heat', true) }}"
-                    current_mode: "{{ raw_mode | string }}"
 
                 - service: system_log.write
                   data:
-                    message: "Speichere Modus für {{ entity }}: {{ current_mode }}"
+                    message: "TEST: Fenster AUF → Schalte {{ entity }} auf OFF"
                     level: info
-
-                - service: input_text.set_value
-                  data:
-                    entity_id: "{{ helper }}"
-                    value: "{{ current_mode }}"
 
                 - service: climate.set_hvac_mode
                   target:
@@ -91,7 +82,7 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → Tuya-sicheres Restore
+      # FENSTER ZU → IMMER direkt AUTO setzen (Test)
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -102,44 +93,14 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
-                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    saved_raw: "{{ states(helper) | default('heat', true) }}"
-                    modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
-
-                    # Tuya-sichere Restore-Logik:
-                    # - off wird NIE restored
-                    # - auto nur, wenn Tuya es erlaubt
-                    # - fallback = heat
-                    zielmodus: >
-                      {% set valid = modes %}
-                      {% if saved_raw == 'off' %}
-                        heat
-                      {% elif saved_raw == 'auto' and 'auto' in valid %}
-                        auto
-                      {% elif saved_raw == 'heat' and 'heat' in valid %}
-                        heat
-                      {% elif 'heat' in valid %}
-                        heat
-                      {% else %}
-                        none
-                      {% endif %}
 
                 - service: system_log.write
                   data:
-                    message: >
-                      Restore für {{ entity }}:
-                      gespeicherter Modus='{{ saved_raw }}',
-                      verfügbare Modi='{{ modes }}',
-                      Ziel='{{ zielmodus }}'
+                    message: "TEST: Fenster ZU → Setze {{ entity }} direkt auf AUTO"
                     level: info
 
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ zielmodus != 'none' }}"
-                      sequence:
-                        - service: climate.set_hvac_mode
-                          target:
-                            entity_id: "{{ entity }}"
-                          data:
-                            hvac_mode: "{{ zielmodus }}"
+                - service: climate.set_hvac_mode
+                  target:
+                    entity_id: "{{ entity }}"
+                  data:
+                    hvac_mode: "auto"
