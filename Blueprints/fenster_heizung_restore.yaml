@@ -93,7 +93,7 @@ action:
       # ---------------------------------------------------------
       # FENSTER ZU → Tuya-sicheres Restore
       # ---------------------------------------------------------
-            - conditions:
+      - conditions:
           - condition: template
             value_template: "{{ is_state(fenster, 'off') }}"
         sequence:
@@ -102,19 +102,27 @@ action:
               sequence:
                 - variables:
                     entity: "{{ repeat.item }}"
+                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
+                    saved_raw: "{{ states(helper) | default('heat', true) }}"
+                    modes: "{{ state_attr(entity, 'hvac_modes') | default([], true) }}"
 
-                - service: system_log.write
-                  data:
-                    message: >
-                      TEST: Setze {{ entity }} beim Fenster-ZU direkt auf AUTO
-                  level: info
-
-                - service: climate.set_hvac_mode
-                  target:
-                    entity_id: "{{ entity }}"
-                  data:
-                    hvac_mode: "auto"
-
+                    # Tuya-sichere Restore-Logik:
+                    # - off wird NIE restored
+                    # - auto nur, wenn Tuya es erlaubt
+                    # - fallback = heat
+                    zielmodus: >
+                      {% set valid = modes %}
+                      {% if saved_raw == 'off' %}
+                        heat
+                      {% elif saved_raw == 'auto' and 'auto' in valid %}
+                        auto
+                      {% elif saved_raw == 'heat' and 'heat' in valid %}
+                        heat
+                      {% elif 'heat' in valid %}
+                        heat
+                      {% else %}
+                        none
+                      {% endif %}
 
                 - service: system_log.write
                   data:
