@@ -1,8 +1,9 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 1 ZIGBEE-FIX
+  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 2
   description: >
-    Fenster auf = OFF (Modus speichern VOR dem Ausschalten), Fenster zu = AUTO.
-    Zigbee-sicherer Modus-Speicher. Area-Erkennung + statische Übergabe.
+    Fenster auf = OFF (Modus speichern VOR dem Ausschalten).
+    Fenster zu = gespeicherten Modus wiederherstellen.
+    Zigbee-sicherer Modus-Speicher + Area-Erkennung.
   domain: automation
 
   input:
@@ -44,7 +45,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        RESTORE-STUFE-1-ZIGBEE-FIX: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        RESTORE-STUFE-2: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
@@ -62,7 +63,7 @@ action:
               erster_heizkoerper: "{{ heiz_liste[0] }}"
               aktueller_modus: "{{ states(erster_heizkoerper) }}"
 
-          # Modus speichern, bevor OFF gesetzt wird
+          # Modus speichern (Zigbee-FIX: vor OFF)
           - service: input_text.set_value
             target:
               entity_id: !input modus_speicher
@@ -76,7 +77,7 @@ action:
             data:
               hvac_mode: "off"
 
-      # Fenster ZU → AUTO (Restore noch NICHT aktiv)
+      # Fenster ZU → gespeicherten Modus wiederherstellen
       - conditions:
           - condition: state
             entity_id: !input fenster
@@ -84,8 +85,24 @@ action:
         sequence:
           - variables:
               heiz_liste: "{{ heizkoerper | list }}"
+              gespeicherter_modus: "{{ states(!input modus_speicher) }}"
+
+              # Zigbee-FIX: off niemals wiederherstellen → auto
+              restore_modus: >
+                {% if gespeicherter_modus in ['auto', 'heat'] %}
+                  {{ gespeicherter_modus }}
+                {% else %}
+                  auto
+                {% endif %}
+
+          - service: system_log.write
+            data:
+              message: >
+                RESTORE-STUFE-2: Wiederherstellung → {{ restore_modus }}
+              level: info
+
           - service: climate.set_hvac_mode
             target:
               entity_id: "{{ heiz_liste }}"
             data:
-              hvac_mode: "auto"
+              hvac_mode: "{{ restore_modus }}"
