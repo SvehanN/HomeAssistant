@@ -1,5 +1,5 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 2
+  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 2 FINAL
   description: >
     Fenster auf = OFF (Modus speichern VOR dem Ausschalten).
     Fenster zu = gespeicherten Modus wiederherstellen.
@@ -33,6 +33,10 @@ trigger:
       - "off"
 
 action:
+
+  # -----------------------------
+  # Gemeinsame Variablen
+  # -----------------------------
   - variables:
       fenster_entity: "{{ trigger.entity_id }}"
       fenster_area: "{{ area_id(fenster_entity) }}"
@@ -45,19 +49,22 @@ action:
   - service: system_log.write
     data:
       message: >
-        RESTORE-STUFE-2: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        FINAL-STUFE-2: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
 
   - choose:
 
-      # Fenster AUF → Modus speichern → OFF
+      # ---------------------------------------------------------
+      # FENSTER AUF → Modus speichern → OFF
+      # ---------------------------------------------------------
       - conditions:
           - condition: state
             entity_id: !input fenster
             state: "on"
         sequence:
+
           - variables:
               heiz_liste: "{{ heizkoerper | list }}"
               erster_heizkoerper: "{{ heiz_liste[0] }}"
@@ -77,17 +84,22 @@ action:
             data:
               hvac_mode: "off"
 
-      # Fenster ZU → gespeicherten Modus wiederherstellen
+      # ---------------------------------------------------------
+      # FENSTER ZU → gespeicherten Modus wiederherstellen
+      # ---------------------------------------------------------
       - conditions:
           - condition: state
             entity_id: !input fenster
             state: "off"
         sequence:
+
           - variables:
               heiz_liste: "{{ heizkoerper | list }}"
-              gespeicherter_modus: "{{ states(!input modus_speicher) }}"
+              modus_speicher_entity: !input modus_speicher
+              gespeicherter_modus: "{{ states(modus_speicher_entity) }}"
 
-              # Zigbee-FIX: off niemals wiederherstellen → auto
+              # Zigbee-FIX:
+              # Wenn der gespeicherte Modus "off" ist → auto
               restore_modus: >
                 {% if gespeicherter_modus in ['auto', 'heat'] %}
                   {{ gespeicherter_modus }}
@@ -98,7 +110,7 @@ action:
           - service: system_log.write
             data:
               message: >
-                RESTORE-STUFE-2: Wiederherstellung → {{ restore_modus }}
+                FINAL-STUFE-2: Restore → {{ restore_modus }}
               level: info
 
           - service: climate.set_hvac_mode
