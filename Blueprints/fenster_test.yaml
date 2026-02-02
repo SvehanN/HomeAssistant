@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 1
+  name: Fenster Test – Ultra Minimal + Area FIX V2 + Restore Stufe 1 FIX
   description: >
     Fenster auf = OFF (Modus speichern), Fenster zu = AUTO.
     Area-Erkennung + Zigbee-kompatible Übergabe.
-    Restore wird NICHT ausgeführt, nur gespeichert.
+    Modus wird über den State gespeichert (nicht hvac_mode).
   domain: automation
 
   input:
@@ -45,7 +45,7 @@ action:
   - service: system_log.write
     data:
       message: >
-        RESTORE-STUFE-1: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
+        RESTORE-STUFE-1-FIX: Fenster={{ fenster_entity }} ({{ states(fenster_entity) }}),
         Area={{ fenster_area }},
         Heizkörper={{ heizkoerper }}
       level: info
@@ -61,7 +61,7 @@ action:
           - variables:
               heiz_liste: "{{ heizkoerper | list }}"
               erster_heizkoerper: "{{ heiz_liste[0] }}"
-              aktueller_modus: "{{ state_attr(erster_heizkoerper, 'hvac_mode') }}"
+              aktueller_modus: "{{ states(erster_heizkoerper) }}"
 
           - service: input_text.set_value
             target:
