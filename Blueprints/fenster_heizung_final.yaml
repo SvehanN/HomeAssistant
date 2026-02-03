@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (AUTO wenn möglich, sonst HEAT – Zigbee-SAFE)
+  name: Fenster steuert Heizkörper (Zigbee immer AUTO)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Beim Öffnen: Heizkörper OFF. Beim Schließen: AUTO wenn verfügbar, sonst HEAT.
-    Keine Helper, kein Restore, Zigbee-sicher.
+    Beim Öffnen: OFF. Beim Schließen: AUTO für alle Geräte.
+    Zigbee erhält AUTO auch wenn es nicht offiziell unterstützt wird.
   domain: automation
 
   input:
@@ -85,7 +85,7 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → AUTO wenn möglich, sonst HEAT
+      # FENSTER ZU → IMMER AUTO (auch für Zigbee)
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -104,25 +104,9 @@ action:
               for_each: "{{ heizkoerper }}"
               sequence:
 
-                - variables:
-                    entity: "{{ repeat.item }}"
-                    modes: "{{ state_attr(entity, 'hvac_modes') }}"
-                    zielmodus: >
-                      {% if 'auto' in modes %}
-                        auto
-                      {% elif 'heat' in modes %}
-                        heat
-                      {% else %}
-                        none
-                      {% endif %}
-
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ zielmodus != 'none' }}"
-                      sequence:
-                        - service: climate.set_hvac_mode
-                          target:
-                            entity_id: "{{ entity }}"
-                          data:
-                            hvac_mode: "{{ zielmodus }}"
+                # Zigbee-Fix: AUTO erzwingen
+                - service: climate.set_hvac_mode
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    hvac_mode: "auto"
