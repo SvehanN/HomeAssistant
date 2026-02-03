@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Auto, Multi, Master, Area, Zigbee-SAFE v2)
+  name: Fenster steuert Heizkörper (Multi, Master, Area, Immer-Auto)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Zigbee-sicher: OFF wird nie gespeichert.
-    Restore nutzt letzten bekannten Modus oder liest ihn direkt vom Gerät.
+    Beim Öffnen: Heizkörper OFF. Beim Schließen: immer AUTO.
+    Keine Modus-Speicherung, Zigbee-sicher.
   domain: automation
 
   input:
@@ -84,7 +84,7 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → Restore
+      # FENSTER ZU → IMMER AUTO
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -101,50 +101,8 @@ action:
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
-
-                # Modus aus Helper oder direkt vom Gerät lesen
-                - variables:
-                    entity: "{{ repeat.item }}"
-                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    helper_value: "{{ states(helper) }}"
-                    current_value: "{{ states(entity) }}"
-
-                    saved: >
-                      {% if helper_value in ['auto','heat'] %}
-                        {{ helper_value }}
-                      {% elif current_value in ['auto','heat'] %}
-                        {{ current_value }}
-                      {% else %}
-                        heat
-                      {% endif %}
-
-                    modes: "{{ state_attr(entity, 'hvac_modes') }}"
-
-                    zielmodus: >
-                      {% if saved == 'auto' and 'auto' in modes %}
-                        auto
-                      {% elif saved == 'heat' and 'heat' in modes %}
-                        heat
-                      {% elif 'heat' in modes %}
-                        heat
-                      {% else %}
-                        none
-                      {% endif %}
-
-                # Restore
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ zielmodus != 'none' }}"
-                      sequence:
-                        - service: climate.set_hvac_mode
-                          target:
-                            entity_id: "{{ entity }}"
-                          data:
-                            hvac_mode: "{{ zielmodus }}"
-
-                # Helper aktualisieren
-                - service: input_text.set_value
+                - service: climate.set_hvac_mode
+                  target:
+                    entity_id: "{{ repeat.item }}"
                   data:
-                    entity_id: "{{ helper }}"
-                    value: "{{ zielmodus }}"
+                    hvac_mode: "auto"
