@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Zigbee-SAFE, Immer-AUTO + Minimal-Helper)
+  name: Fenster steuert Heizkörper (Auto-Helper, Zigbee-SAFE, Immer-AUTO)
   description: >
     Multi-Fensterkontakte, Area-Erkennung, Zigbee-sicher.
-    Modus wird VOR OFF gespeichert – aber nur vom ERSTEN Heizkörper der Area (Minimal-Script-Logik).
+    Modus wird VOR OFF gespeichert – automatisch pro Heizkörper (Minimal-Script-Logik).
     Beim Schließen wird IMMER AUTO gesetzt.
   domain: automation
 
@@ -24,12 +24,6 @@ blueprint:
       selector:
         entity:
           domain: input_boolean
-
-    modus_speicher:
-      name: Helper zum Speichern des Modus
-      selector:
-        entity:
-          domain: input_text
 
 mode: parallel
 
@@ -81,6 +75,18 @@ action:
           - variables:
               erster_heizkoerper: "{{ heiz_liste[0] }}"
               aktueller_modus: "{{ states(erster_heizkoerper) }}"
+              helper: "input_text.heizmodus_{{ erster_heizkoerper|replace('.', '_') }}"
+
+          # Helper automatisch erzeugen, falls er fehlt
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ helper not in states }}"
+                sequence:
+                  - service: input_text.set_value
+                    data:
+                      entity_id: "{{ helper }}"
+                      value: ""
 
           # Modus speichern (nur heat/auto)
           - choose:
@@ -90,7 +96,7 @@ action:
                 sequence:
                   - service: input_text.set_value
                     target:
-                      entity_id: !input modus_speicher
+                      entity_id: "{{ helper }}"
                     data:
                       value: "{{ aktueller_modus }}"
 
