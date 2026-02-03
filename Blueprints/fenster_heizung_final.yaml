@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Zigbee-SAFE, Immer-AUTO)
+  name: Fenster steuert Heizkörper (Zigbee-SAFE, Immer-AUTO + Helper)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Zigbee-sicher: Modus wird VOR OFF gespeichert, aber nicht restored.
+    Zigbee-sicher: Modus wird VOR OFF gespeichert (heat/auto), aber nicht restored.
     Beim Schließen wird IMMER AUTO gesetzt.
   domain: automation
 
@@ -80,6 +80,7 @@ action:
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
+
                 - variables:
                     entity: "{{ repeat.item }}"
                     helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
@@ -104,7 +105,7 @@ action:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → IMMER AUTO (Restore entfernt)
+      # FENSTER ZU → IMMER AUTO (Zigbee-FIX)
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -120,7 +121,7 @@ action:
                    | select('match', '^climate\\.')
                    | list }}
 
-          # IMMER AUTO setzen
+          # IMMER AUTO setzen (auch für Zigbee)
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
