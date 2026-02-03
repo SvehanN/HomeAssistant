@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Multi, Master, Area, Zigbee-SAFE 2)
+  name: Fenster steuert Heizkörper (Auto-Tracker, Multi, Master, Area, Zigbee-SAFE)
   description: >
-    Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Zigbee-sicher: Modus wird NICHT beim Fensteröffnen gespeichert.
-    Restore setzt zuverlässig AUTO/HEAT, OFF wird nie restored.
+    Steuert Heizkörper anhand von Fensterkontakten.
+    Automatisches Tracking ALLER Heizkörper (kein manueller Tracker nötig).
+    Zigbee-sicher: OFF wird nie gespeichert, Restore nutzt letzten echten Modus.
   domain: automation
 
   input:
@@ -28,11 +28,16 @@ blueprint:
 mode: parallel
 
 trigger:
+  # Fensterkontakte
   - platform: state
     entity_id: !input fensterkontakte
     to:
       - "on"
       - "off"
+
+  # Modus-Tracker: ALLE Climate-Entities
+  - platform: state
+    entity_id: "*"
 
 condition:
   - condition: state
@@ -42,20 +47,41 @@ condition:
 action:
 
   # ---------------------------------------------------------
-  # 1) YAML-Variablen (dürfen !input enthalten)
+  # 1) YAML-Variablen
   # ---------------------------------------------------------
   - variables:
       fenster_liste: !input fensterkontakte
 
   # ---------------------------------------------------------
-  # 2) Template-Variablen (KEIN !input erlaubt)
+  # 2) Template-Variablen
   # ---------------------------------------------------------
   - variables:
       trigger_entity: "{{ trigger.entity_id }}"
       is_window: "{{ trigger_entity in fenster_liste }}"
+      is_climate: "{{ trigger_entity.startswith('climate.') }}"
 
   # ---------------------------------------------------------
-  # 3) Fensteraktionen
+  # 3) MODUS-TRACKER (für ALLE Heizkörper)
+  # ---------------------------------------------------------
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ is_climate }}"
+        sequence:
+          - variables:
+              helper: "input_text.heizmodus_{{ trigger_entity|replace('.', '_') }}"
+              saved: "{{ states(trigger_entity) }}"
+          - service: input_text.set_value
+            data:
+              entity_id: "{{ helper }}"
+              value: "{{ saved }}"
+          - service: system_log.write
+            data:
+              message: "Tracker: Speichere Modus {{ saved }} für {{ trigger_entity }}"
+              level: info
+
+  # ---------------------------------------------------------
+  # 4) FENSTER-AKTIONEN
   # ---------------------------------------------------------
   - choose:
 
