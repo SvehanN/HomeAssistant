@@ -1,5 +1,5 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Multi, Master, Area, Zigbee-SAFE)
+  name: Fenster steuert Heizkörper (Multi, Master, Area, Zigbee-SAFE f)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
     Zigbee-sicher: Modus wird NICHT beim Fensteröffnen gespeichert,
