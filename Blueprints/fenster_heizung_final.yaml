@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Zigbee-SAFE, Immer-AUTO)
+  name: Fenster steuert Heizkörper (Zigbee-SAFE, Immer-AUTO, ohne Helper)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Zigbee-sicher: Modus wird VOR OFF gespeichert, aber nicht restored.
-    Beim Schließen wird IMMER AUTO gesetzt.
+    Beim Öffnen: Heizkörper OFF. Beim Schließen: immer AUTO.
+    Keine Helper, kein Restore, keine Fehlermeldungen.
   domain: automation
 
   input:
@@ -60,14 +60,13 @@ action:
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF → Modus speichern → OFF
+      # FENSTER AUF → OFF
       # ---------------------------------------------------------
       - conditions:
           - condition: template
             value_template: "{{ is_window and is_state(fenster, 'on') }}"
         sequence:
 
-          # Area ermitteln
           - variables:
               area_id_val: "{{ area_id(fenster) }}"
               area_entities: "{{ area_entities(area_id_val) }}"
@@ -76,42 +75,23 @@ action:
                    | select('match', '^climate\\.')
                    | list }}
 
-          # Modus speichern VOR OFF
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
-                - variables:
-                    entity: "{{ repeat.item }}"
-                    helper: "input_text.heizmodus_{{ entity|replace('.', '_') }}"
-                    current_mode: "{{ states(entity) }}"
-
-                # Nur heat/auto speichern – niemals off
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ current_mode in ['heat','auto'] }}"
-                      sequence:
-                        - service: input_text.set_value
-                          data:
-                            entity_id: "{{ helper }}"
-                            value: "{{ current_mode }}"
-
-                # Jetzt OFF setzen
                 - service: climate.set_hvac_mode
                   target:
-                    entity_id: "{{ entity }}"
+                    entity_id: "{{ repeat.item }}"
                   data:
                     hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → IMMER AUTO (Restore entfernt)
+      # FENSTER ZU → IMMER AUTO
       # ---------------------------------------------------------
       - conditions:
           - condition: template
             value_template: "{{ is_window and is_state(fenster, 'off') }}"
         sequence:
 
-          # Area ermitteln
           - variables:
               area_id_val: "{{ area_id(fenster) }}"
               area_entities: "{{ area_entities(area_id_val) }}"
@@ -120,7 +100,6 @@ action:
                    | select('match', '^climate\\.')
                    | list }}
 
-          # IMMER AUTO setzen
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
