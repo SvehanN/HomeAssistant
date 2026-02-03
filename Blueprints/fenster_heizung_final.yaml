@@ -1,9 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Multi, Master, Area, Zigbee-SAFE f)
+  name: Fenster steuert Heizkörper (Multi, Master, Area, Zigbee-SAFE 2)
   description: >
     Multi-Fensterkontakte, Hauptschalter, Area-basierte Heizungssteuerung.
-    Zigbee-sicher: Modus wird NICHT beim Fensteröffnen gespeichert,
-    sondern automatisch getrackt, sobald er sich ändert.
+    Zigbee-sicher: Modus wird NICHT beim Fensteröffnen gespeichert.
     Restore setzt zuverlässig AUTO/HEAT, OFF wird nie restored.
   domain: automation
 
@@ -29,17 +28,11 @@ blueprint:
 mode: parallel
 
 trigger:
-  # Fensterkontakte
   - platform: state
     entity_id: !input fensterkontakte
     to:
       - "on"
       - "off"
-
-  # Modus-Tracker: alle Climate-Entities
-  - platform: state
-    entity_id: >
-      {{ states.climate | map(attribute='entity_id') | list }}
 
 condition:
   - condition: state
@@ -60,30 +53,9 @@ action:
   - variables:
       trigger_entity: "{{ trigger.entity_id }}"
       is_window: "{{ trigger_entity in fenster_liste }}"
-      is_climate: "{{ trigger_entity.startswith('climate.') }}"
 
   # ---------------------------------------------------------
-  # 3) MODUS-TRACKER (wenn ein Heizkörper sich ändert)
-  # ---------------------------------------------------------
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ is_climate }}"
-        sequence:
-          - variables:
-              helper: "input_text.heizmodus_{{ trigger_entity|replace('.', '_') }}"
-              saved: "{{ states(trigger_entity) }}"
-          - service: input_text.set_value
-            data:
-              entity_id: "{{ helper }}"
-              value: "{{ saved }}"
-          - service: system_log.write
-            data:
-              message: "Tracker: Speichere Modus {{ saved }} für {{ trigger_entity }}"
-              level: info
-
-  # ---------------------------------------------------------
-  # 4) FENSTER-AKTIONEN
+  # 3) Fensteraktionen
   # ---------------------------------------------------------
   - choose:
 
@@ -105,11 +77,6 @@ action:
           - repeat:
               for_each: "{{ heizkoerper }}"
               sequence:
-                - service: system_log.write
-                  data:
-                    message: "Fenster offen → OFF für {{ repeat.item }}"
-                    level: info
-
                 - service: climate.set_hvac_mode
                   target:
                     entity_id: "{{ repeat.item }}"
@@ -150,15 +117,6 @@ action:
                       {% else %}
                         none
                       {% endif %}
-
-                - service: system_log.write
-                  data:
-                    message: >
-                      Restore {{ entity }}:
-                      gespeichert='{{ saved }}',
-                      erlaubt='{{ modes }}',
-                      Ziel='{{ zielmodus }}'
-                    level: info
 
                 - choose:
                     - conditions:
