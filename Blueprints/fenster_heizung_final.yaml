@@ -1,8 +1,8 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Auto-Helper, Zigbee-SAFE, Immer-AUTO v2)
+  name: Fenster steuert Heizkörper (Auto-Helper, Zigbee-SAFE, Immer-AUTO v2.01)
   description: >
     Multi-Fensterkontakte, Area-Erkennung, Zigbee-sicher.
-    Modus wird VOR OFF gespeichert – automatisch pro Heizkörper (Minimal-Script-Logik).
+    Modus wird VOR OFF gespeichert – automatisch pro Heizkörper.
     Beim Schließen wird IMMER AUTO gesetzt und das Sync-Script getriggert.
   domain: automation
 
@@ -41,43 +41,32 @@ condition:
 
 action:
 
-  # ---------------------------------------------------------
-  # 1) Variablen
-  # ---------------------------------------------------------
   - variables:
       fenster_liste: !input fensterkontakte
       fenster: "{{ trigger.entity_id }}"
       is_window: "{{ fenster in fenster_liste }}"
 
-  # ---------------------------------------------------------
-  # 2) Fensteraktionen
-  # ---------------------------------------------------------
   - choose:
 
       # ---------------------------------------------------------
-      # FENSTER AUF → Modus speichern (nur erster Heizkörper) → OFF
+      # FENSTER AUF → Modus speichern → OFF
       # ---------------------------------------------------------
       - conditions:
           - condition: template
             value_template: "{{ is_window and is_state(fenster, 'on') }}"
         sequence:
 
-          # Area ermitteln
           - variables:
               area_id_val: "{{ area_id(fenster) }}"
               area_entities: "{{ area_entities(area_id_val) }}"
               heiz_liste: >
-                {{ area_entities
-                   | select('match', '^climate\\.')
-                   | list }}
+                {{ area_entities | select('match', '^climate\\.') | list }}
 
-          # Nur ERSTEN Heizkörper verwenden (Minimal-Script-Logik)
           - variables:
               erster_heizkoerper: "{{ heiz_liste[0] }}"
               aktueller_modus: "{{ states(erster_heizkoerper) }}"
               helper: "input_text.heizmodus_{{ erster_heizkoerper|replace('.', '_') }}"
 
-          # Helper automatisch erzeugen, falls er fehlt
           - choose:
               - conditions:
                   - condition: template
@@ -88,7 +77,6 @@ action:
                       entity_id: "{{ helper }}"
                       value: ""
 
-          # Modus speichern (nur heat/auto)
           - choose:
               - conditions:
                   - condition: template
@@ -100,7 +88,6 @@ action:
                     data:
                       value: "{{ aktueller_modus }}"
 
-          # Jetzt OFF setzen (für alle Heizkörper der Area)
           - service: climate.set_hvac_mode
             target:
               entity_id: "{{ heiz_liste }}"
@@ -119,16 +106,13 @@ action:
               area_id_val: "{{ area_id(fenster) }}"
               area_entities: "{{ area_entities(area_id_val) }}"
               heiz_liste: >
-                {{ area_entities
-                   | select('match', '^climate\\.')
-                   | list }}
+                {{ area_entities | select('match', '^climate\\.') | list }}
 
-          # Heizkörper wieder einschalten
           - service: climate.set_hvac_mode
             target:
               entity_id: "{{ heiz_liste }}"
             data:
               hvac_mode: "auto"
 
-          # Sync-Script triggern
-          - event: hk_bad_sync
+          # ⭐ WICHTIG: Event senden
+          - event: fenster_bad_closed
