@@ -1,9 +1,9 @@
 blueprint:
-  name: Fenster steuert Heizkörper (Auto-Helper, Zigbee-SAFE, Immer-AUTO)
+  name: Fenster steuert Heizkörper (Auto-Helper, Zigbee-SAFE, Immer-AUTO v2)
   description: >
     Multi-Fensterkontakte, Area-Erkennung, Zigbee-sicher.
     Modus wird VOR OFF gespeichert – automatisch pro Heizkörper (Minimal-Script-Logik).
-    Beim Schließen wird IMMER AUTO gesetzt.
+    Beim Schließen wird IMMER AUTO gesetzt und das Sync-Script getriggert.
   domain: automation
 
   input:
@@ -108,7 +108,7 @@ action:
               hvac_mode: "off"
 
       # ---------------------------------------------------------
-      # FENSTER ZU → IMMER AUTO
+      # FENSTER ZU → IMMER AUTO + Sync-Script triggern
       # ---------------------------------------------------------
       - conditions:
           - condition: template
@@ -123,8 +123,12 @@ action:
                    | select('match', '^climate\\.')
                    | list }}
 
+          # Heizkörper wieder einschalten
           - service: climate.set_hvac_mode
             target:
               entity_id: "{{ heiz_liste }}"
             data:
               hvac_mode: "auto"
+
+          # Sync-Script triggern
+          - event: hk_bad_sync
